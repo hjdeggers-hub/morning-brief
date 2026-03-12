@@ -1,4 +1,4 @@
 feedparser==6.0.11
-google-generativeai
+google-genai
 sendgrid==6.11.0
 pytz==2024.1
