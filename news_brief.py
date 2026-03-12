@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
 Hunter's Daily News Brief
-Fetches RSS feeds, summarizes with Claude API, sends via SendGrid.
+Fetches RSS feeds, summarizes with Gemini API, sends via SendGrid.
 """
 
 import os
 import json
 import feedparser
-import anthropic
+import google.generativeai as genai
 import sendgrid
 from sendgrid.helpers.mail import Mail
 from datetime import datetime, date
@@ -19,7 +19,7 @@ import pytz
 
 RECIPIENT_EMAIL = os.environ["RECIPIENT_EMAIL"]       # your email
 SENDER_EMAIL    = os.environ["SENDER_EMAIL"]          # verified SendGrid sender
-ANTHROPIC_KEY   = os.environ["ANTHROPIC_API_KEY"]
+GEMINI_KEY      = os.environ["GEMINI_API_KEY"]
 SENDGRID_KEY    = os.environ["SENDGRID_API_KEY"]
 
 IS_SUNDAY = date.today().weekday() == 6
@@ -152,13 +152,14 @@ def group_by_section(articles):
     return grouped
 
 # âââââââââââââââââââââââââââââââââââââââââââââ
-# CLAUDE SUMMARIZATION
+# GEMINI SUMMARIZATION
 # âââââââââââââââââââââââââââââââââââââââââââââ
 
-def summarize_with_claude(grouped):
-    client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
+def summarize_with_gemini(grouped):
+    genai.configure(api_key=GEMINI_KEY)
+    model = genai.GenerativeModel("gemini-1.5-flash")
 
-    # Build input payload for Claude
+    # Build input payload
     payload = []
     for section, arts in grouped.items():
         if not arts:
@@ -179,8 +180,8 @@ def summarize_with_claude(grouped):
 
     prompt = f"""You are the editor of Hunter's Morning News Brief â a personalized daily newspaper.
 
-Hunter's background: works in grants finance at One Acre Fund (agricultural development in Africa), 
-deeply interested in degrowth economics, food systems, anti-capitalist theory, African development, 
+Hunter's background: works in grants finance at One Acre Fund (agricultural development in Africa),
+deeply interested in degrowth economics, food systems, anti-capitalist theory, African development,
 solidarity economy, and local NYC/Westchester life. Married, lives in Pelham NY.
 
 Today is {datetime.now(pytz.timezone('America/New_York')).strftime('%A, %B %d, %Y')}.
@@ -223,13 +224,8 @@ Your task:
   ]
 }}"""
 
-    response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=4000,
-        messages=[{"role": "user", "content": prompt}]
-    )
-
-    raw = response.content[0].text.strip()
+    response = model.generate_content(prompt)
+    raw = response.text.strip()
     # Strip markdown fences if present
     if raw.startswith("```"):
         raw = raw.split("```")[1]
@@ -358,7 +354,7 @@ def build_html(brief):
   <tr><td style="background:{header_color};padding:20px 40px;text-align:center;">
     <div style="color:#888;font-size:11px;font-family:Arial,sans-serif;line-height:1.8;">
       Hunter's Morning Brief Â· Delivered daily at 7 AM ET<br/>
-      Built with Claude + SendGrid + GitHub Actions
+      Built with Gemini + SendGrid + GitHub Actions
     </div>
   </td></tr>
 
@@ -397,8 +393,8 @@ def main():
     print("Grouping by section...")
     grouped = group_by_section(articles)
 
-    print("Summarizing with Claude...")
-    brief = summarize_with_claude(grouped)
+    print("Summarizing with Gemini...")
+    brief = summarize_with_gemini(grouped)
 
     print("Building HTML...")
     html = build_html(brief)
