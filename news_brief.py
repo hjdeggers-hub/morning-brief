@@ -7,7 +7,7 @@ Fetches RSS feeds, summarizes with Gemini API, sends via SendGrid.
 import os
 import json
 import feedparser
-import google.generativeai as genai
+from google import genai
 import sendgrid
 from sendgrid.helpers.mail import Mail
 from datetime import datetime, date
@@ -156,8 +156,7 @@ def group_by_section(articles):
 # âââââââââââââââââââââââââââââââââââââââââââââ
 
 def summarize_with_gemini(grouped):
-    genai.configure(api_key=GEMINI_KEY)
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    client = genai.Client(api_key=GEMINI_KEY)
 
     # Build input payload
     payload = []
@@ -224,7 +223,7 @@ Your task:
   ]
 }}"""
 
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
     raw = response.text.strip()
     # Strip markdown fences if present
     if raw.startswith("```"):
